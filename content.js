@@ -62,6 +62,14 @@
     host.id = HOST_ID;
     root = host.attachShadow({ mode: 'open' });
 
+    // Keep keyboard input inside the overlay from reaching YouTube's shortcut
+    // handlers — e.g. Space pausing the video, or k/j/l seeking, while the user
+    // is typing a comment. Our fields live in a shadow DOM, so YouTube can't see
+    // that a field is focused and would otherwise act on every keystroke.
+    for (const type of ['keydown', 'keyup', 'keypress']) {
+      host.addEventListener(type, (event) => event.stopPropagation());
+    }
+
     const style = createElement('style');
     style.textContent = `
       :host {
