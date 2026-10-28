@@ -12,14 +12,13 @@
     posY: null,
   };
   const settings = { ...DEFAULT_SETTINGS };
-  const emittedComments = new Set();
+  const rendered = new Map();
   let host;
   let root;
   let panel;
   let feed;
   let menu;
   let menuTrigger;
-  let lastTime = null;
   let videoId = '';
   let comments = [];
   let lastStatus = '';
@@ -434,11 +433,32 @@
   function clearForVideo(id) {
     videoId = id;
     comments = [];
-    emittedComments.clear();
-    lastTime = null;
+    rendered.clear();
     feed.replaceChildren();
     showStatus('Loading comments from YouTube…');
     requestComments(id);
+  }
+
+  // Visible comments are a pure function of the playhead: a comment is shown
+  // only once playback has reached its timestamp, and scrubbing backward past a
+  // timestamp removes that comment so it re-appears when the video plays forward
+  // again.
+  function syncCommentsToTime(currentTime) {
+    let removedAny = false;
+    for (const [key, el] of rendered) {
+      if (Number(el.dataset.time) > currentTime) {
+        el.remove();
+        rendered.delete(key);
+        removedAny = true;
+      }
+    }
+    const toAdd = comments
+      .filter((comment) => comment.time <= currentTime && !rendered.has(comment.key))
+      .sort((left, right) => left.time - right.time);
+    toAdd.forEach(renderComment);
+    if (removedAny && rendered.size === 0 && lastStatus) {
+      showStatus(lastStatus);
+    }
   }
 
   function parseTimestamp(text) {
@@ -507,8 +527,7 @@
       } else {
         videoId = '';
         comments = [];
-        emittedComments.clear();
-        lastTime = null;
+        rendered.clear();
         feed.replaceChildren();
         showStatus('Open a YouTube video to see synchronized comments.');
       }
@@ -520,38 +539,24 @@
     const video = document.querySelector('video');
     if (!video) return;
 
-    const currentTime = Math.floor(video.currentTime);
-    if (lastTime === null) {
-      lastTime = currentTime - 1;
-    }
-    if (currentTime < lastTime) {
-      lastTime = currentTime;
-      return;
-    }
-
-    if (currentTime > lastTime) {
-      const matching = comments
-        .filter((comment) => comment.time > lastTime && comment.time <= currentTime)
-        .sort((left, right) => left.time - right.time);
-      matching.forEach(renderComment);
-      lastTime = currentTime;
-    }
+    syncCommentsToTime(Math.floor(video.currentTime));
   }
 
   function renderComment(comment) {
-    if (emittedComments.has(comment.key)) return;
-    emittedComments.add(comment.key);
+    if (rendered.has(comment.key)) return;
 
     const status = feed.querySelector('.status');
     if (status) status.remove();
 
     const item = createElement('article', 'comment');
+    item.dataset.time = String(comment.time);
     const author = createElement('strong', '', comment.author);
     const timestamp = createElement('span', 'timestamp', `[${formatTime(comment.time)}]`);
     const text = createElement('div', '', comment.text);
     item.append(author, timestamp, text);
     feed.appendChild(item);
     feed.scrollTop = feed.scrollHeight;
+    rendered.set(comment.key, item);
   }
 
   function formatTime(seconds) {
@@ -576,8 +581,7 @@
     applySettings();
     if (changes.youtubeApiKey && videoId) {
       comments = [];
-      emittedComments.clear();
-      lastTime = null;
+      rendered.clear();
       feed.replaceChildren();
       showStatus('Loading comments from YouTube…');
       requestComments(videoId);
