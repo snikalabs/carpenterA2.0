@@ -8,6 +8,8 @@
     youtubeApiKey: '',
     width: 330,
     height: 440,
+    posX: null,
+    posY: null,
   };
   const settings = { ...DEFAULT_SETTINGS };
   const emittedComments = new Set();
@@ -21,6 +23,7 @@
   let videoId = '';
   let comments = [];
   let lastStatus = '';
+  let dragging = false;
 
   if (window.top !== window) return;
 
@@ -83,8 +86,10 @@
       .resize-grip.top-left { top: 0; left: 0; cursor: nwse-resize; transform: rotate(180deg); }
       .resize-grip.top-right { top: 0; right: 0; cursor: nesw-resize; transform: rotate(90deg); }
       .resize-grip.bottom-left { bottom: 0; left: 0; cursor: nesw-resize; transform: rotate(-90deg); }
+      .resize-grip.bottom-right { bottom: 0; right: 0; cursor: nwse-resize; }
       .header { display: flex; align-items: center; gap: 8px; padding: 10px 12px;
-        background: #101820; border-radius: 12px 12px 0 0; }
+        background: #101820; border-radius: 12px 12px 0 0;
+        cursor: move; touch-action: none; user-select: none; }
       .title { flex: 1; font-size: 14px; font-weight: 700; }
       button, select, input { font: inherit; }
       button { color: inherit; cursor: pointer; }
@@ -142,6 +147,32 @@
     closeButton.addEventListener('click', () => saveSettings({ overlayEnabled: false }));
     header.appendChild(closeButton);
 
+    header.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0 || event.target.closest('button')) return;
+      event.preventDefault();
+      dragging = true;
+      const bounds = panel.getBoundingClientRect();
+      const offsetX = event.clientX - bounds.left;
+      const offsetY = event.clientY - bounds.top;
+      try { header.setPointerCapture(event.pointerId); } catch {}
+      const drag = (moveEvent) => {
+        const maxX = Math.max(0, innerWidth - bounds.width);
+        const maxY = Math.max(0, innerHeight - bounds.height);
+        const x = Math.max(0, Math.min(moveEvent.clientX - offsetX, maxX));
+        const y = Math.max(0, Math.min(moveEvent.clientY - offsetY, maxY));
+        placePanelAt(x, y);
+      };
+      const finishDrag = () => {
+        dragging = false;
+        header.removeEventListener('pointermove', drag);
+        const moved = panel.getBoundingClientRect();
+        saveSettings({ posX: Math.round(moved.left), posY: Math.round(moved.top) });
+      };
+      header.addEventListener('pointermove', drag);
+      header.addEventListener('pointerup', finishDrag, { once: true });
+      header.addEventListener('pointercancel', finishDrag, { once: true });
+    });
+
     feed = createElement('div', 'feed');
     feed.setAttribute('aria-live', 'polite');
     feed.setAttribute('aria-relevant', 'additions text');
@@ -151,18 +182,21 @@
       openMenu(null, event.clientX, event.clientY);
     });
 
-    const footer = createElement('footer', 'footer', 'Loads up to 200 timestamped comments through the YouTube Data API. Drag the opposite corner to resize.');
+    const footer = createElement('footer', 'footer', 'Loads up to 200 timestamped comments through the YouTube Data API. Drag the header to move, the opposite corner to resize.');
     const resizeGrip = createElement('div', 'resize-grip');
     resizeGrip.setAttribute('role', 'separator');
     resizeGrip.setAttribute('aria-label', 'Resize overlay from the corner opposite its position');
     resizeGrip.addEventListener('pointerdown', (event) => {
       event.preventDefault();
       const bounds = panel.getBoundingClientRect();
-      const gripPosition = settings.position === 'bottom-right'
-        ? 'top-left'
-        : settings.position === 'bottom-left'
-          ? 'top-right'
-          : 'bottom-left';
+      const hasCustomPos = Number.isFinite(settings.posX) && Number.isFinite(settings.posY);
+      const gripPosition = hasCustomPos
+        ? 'bottom-right'
+        : settings.position === 'bottom-right'
+          ? 'top-left'
+          : settings.position === 'bottom-left'
+            ? 'top-right'
+            : 'bottom-left';
       const growsLeft = gripPosition.includes('left');
       const growsUp = gripPosition.includes('top');
 
@@ -262,7 +296,7 @@
       positionSelect.appendChild(option);
     }
     positionSelect.addEventListener('change', () => {
-      saveSettings({ position: positionSelect.value });
+      saveSettings({ position: positionSelect.value, posX: null, posY: null });
     });
     positionLabel.appendChild(positionSelect);
     settingsMenu.appendChild(positionLabel);
@@ -298,20 +332,50 @@
     return label;
   }
 
+  function placePanelAt(x, y) {
+    if (!panel) return;
+    panel.classList.remove('bottom-right', 'bottom-left');
+    panel.style.left = `${Math.round(x)}px`;
+    panel.style.top = `${Math.round(y)}px`;
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  }
+
   function applySettings() {
     if (!panel || !menu) return;
 
     const visible = Boolean(settings.overlayEnabled && settings.youtubeEnabled && isWatchPage());
     panel.hidden = !visible;
-    panel.classList.toggle('bottom-right', settings.position === 'bottom-right');
-    panel.classList.toggle('bottom-left', settings.position === 'bottom-left');
-    const gripPosition = settings.position === 'bottom-right'
-      ? 'top-left'
-      : settings.position === 'bottom-left'
-        ? 'top-right'
-        : 'bottom-left';
+    const hasCustomPos = Number.isFinite(settings.posX) && Number.isFinite(settings.posY);
+    if (!dragging) {
+      if (hasCustomPos) {
+        panel.classList.remove('bottom-right', 'bottom-left');
+        const w = panel.offsetWidth || Number(settings.width) || 330;
+        const h = panel.offsetHeight || Number(settings.height) || 440;
+        const x = Math.max(0, Math.min(settings.posX, Math.max(0, innerWidth - w)));
+        const y = Math.max(0, Math.min(settings.posY, Math.max(0, innerHeight - h)));
+        panel.style.left = `${x}px`;
+        panel.style.top = `${y}px`;
+        panel.style.right = 'auto';
+        panel.style.bottom = 'auto';
+      } else {
+        panel.style.left = '';
+        panel.style.top = '';
+        panel.style.right = '';
+        panel.style.bottom = '';
+        panel.classList.toggle('bottom-right', settings.position === 'bottom-right');
+        panel.classList.toggle('bottom-left', settings.position === 'bottom-left');
+      }
+    }
+    const gripPosition = hasCustomPos
+      ? 'bottom-right'
+      : settings.position === 'bottom-right'
+        ? 'top-left'
+        : settings.position === 'bottom-left'
+          ? 'top-right'
+          : 'bottom-left';
     const resizeGrip = panel.querySelector('.resize-grip');
-    resizeGrip.classList.remove('top-left', 'top-right', 'bottom-left');
+    resizeGrip.classList.remove('top-left', 'top-right', 'bottom-left', 'bottom-right');
     resizeGrip.classList.add(gripPosition);
     panel.style.opacity = String(settings.opacity);
     panel.style.width = `min(${settings.width}px, calc(100vw - 24px))`;
