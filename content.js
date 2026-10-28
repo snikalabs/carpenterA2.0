@@ -207,26 +207,12 @@
         border: 1px solid var(--c-border); border-radius: 5px; padding: 4px; }
       .menu-note { margin: 10px 0 0; color: var(--c-text-muted); font-size: 11px; }
       .api-key-setting { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+      .api-key-setting[hidden] { display: none; }
       .api-key-setting input { width: 100%; padding: 6px; color: var(--c-text);
         background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 5px; }
       .menu-action { width: 100%; margin-top: 10px; padding: 7px;
         color: inherit; text-align: left; background: var(--c-surface);
         border: 1px solid var(--c-border); border-radius: 6px; }
-      .theme-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 6px 0 2px; }
-      .swatch { position: relative; padding: 0; border: 1px solid var(--c-border); border-radius: 7px;
-        background: var(--sw-bg); overflow: hidden; height: 40px; cursor: pointer; }
-      .swatch-prev { position: absolute; inset: 4px 4px 13px; display: flex; flex-direction: column;
-        justify-content: center; gap: 3px; border-radius: 4px; padding: 4px; box-shadow: inset 0 0 0 1px var(--sw-outer); }
-      .swatch-bar { height: 4px; border-radius: 2px; background: var(--sw-bubble); border-left: 2px solid var(--sw-who); }
-      .swatch-bar.short { width: 68%; }
-      .swatch-name { position: absolute; left: 0; right: 0; bottom: 0; font-size: 8px; line-height: 12px;
-        text-align: center; color: var(--c-text); background: var(--c-header);
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; }
-      .swatch.selected { outline: 2px solid var(--c-accent); outline-offset: 1px; }
-      .swatch-lock { position: absolute; top: 2px; right: 3px; font-size: 9px; color: #ffd24d;
-        text-shadow: 0 1px 2px #000; display: none; }
-      .swatch.locked .swatch-lock { display: block; }
-      .swatch.locked { opacity: 0.55; cursor: default; }
       @media (max-width: 480px) {
         .panel { top: 12px; right: 12px; max-height: 85vh; }
         .panel.bottom-right { top: auto; bottom: 12px; }
@@ -414,8 +400,18 @@
       'Unlock premium themes (testing)',
       'Dev toggle: unlock the premium themes for testing',
     ));
-    const themeGrid = buildThemeGrid();
-    settingsMenu.appendChild(themeGrid);
+    const themeLabel = createElement('label', 'setting');
+    themeLabel.appendChild(createElement('span', '', 'Theme'));
+    const themeSelect = createElement('select');
+    themeSelect.setAttribute('aria-label', 'Overlay theme');
+    for (const theme of THEMES) {
+      const option = createElement('option', '', theme.name + (theme.premium ? ' ★' : ''));
+      option.value = theme.id;
+      themeSelect.appendChild(option);
+    }
+    themeSelect.addEventListener('change', () => saveSettings({ theme: themeSelect.value }));
+    themeLabel.appendChild(themeSelect);
+    settingsMenu.appendChild(themeLabel);
 
     settingsMenu.appendChild(buildCheckboxSetting(
       'overlayEnabled',
@@ -433,7 +429,10 @@
       'Show your channel name instead of "You" on comments you post',
     ));
 
+    const apiKeyNote = createElement('p', 'menu-note', '');
+    apiKeyNote.hidden = true;
     const apiKeyLabel = createElement('label', 'api-key-setting');
+    apiKeyLabel.hidden = true;
     apiKeyLabel.appendChild(createElement('span', '', 'YouTube Data API key'));
     const apiKeyInput = createElement('input');
     apiKeyInput.type = 'password';
@@ -443,6 +442,7 @@
       saveSettings({ youtubeApiKey: apiKeyInput.value.trim() });
     });
     apiKeyLabel.appendChild(apiKeyInput);
+    settingsMenu.appendChild(apiKeyNote);
     settingsMenu.appendChild(apiKeyLabel);
 
     const opacityLabel = createElement('label', 'setting');
@@ -479,15 +479,12 @@
     positionLabel.appendChild(positionSelect);
     settingsMenu.appendChild(positionLabel);
 
-    const note = createElement('p', 'menu-note', 'Create a key in Google Cloud and enable YouTube Data API v3. This prototype stores the key locally, but it is not secret in a browser extension. Restrict it to the YouTube Data API. Right-click the comments area or use Alt+Shift+M to open this menu.');
-    settingsMenu.appendChild(note);
-
     const closeMenuButton = createElement('button', 'menu-action', 'Close settings');
     closeMenuButton.type = 'button';
     closeMenuButton.addEventListener('click', closeMenu);
     settingsMenu.appendChild(closeMenuButton);
 
-    settingsMenu._controls = { opacityInput, positionSelect, apiKeyInput, themeGrid };
+    settingsMenu._controls = { opacityInput, positionSelect, apiKeyInput, themeSelect, apiKeyLabel, apiKeyNote };
     settingsMenu.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -533,41 +530,27 @@
     for (const prop in map) host.style.setProperty(prop, map[prop]);
   }
 
-  function buildThemeGrid() {
-    const grid = createElement('div', 'theme-grid');
-    const swatches = [];
-    for (const theme of THEMES) {
-      const sw = createElement('button', 'swatch');
-      sw.type = 'button';
-      sw.dataset.theme = theme.id;
-      sw.title = theme.name + (theme.premium ? ' (Premium)' : '');
-      sw.setAttribute('aria-label', sw.title);
-      sw.style.setProperty('--sw-bg', theme.bg);
-      sw.style.setProperty('--sw-bubble', theme.bubble);
-      sw.style.setProperty('--sw-outer', theme.outer);
-      sw.style.setProperty('--sw-who', theme.who);
-      const prev = createElement('div', 'swatch-prev');
-      prev.append(createElement('div', 'swatch-bar'), createElement('div', 'swatch-bar short'));
-      sw.append(prev, createElement('div', 'swatch-lock', '★'), createElement('div', 'swatch-name', theme.name));
-      sw.addEventListener('click', () => {
-        if (theme.premium && !settings.isPremium) return;
-        saveSettings({ theme: theme.id });
-      });
-      swatches.push(sw);
-      grid.appendChild(sw);
+  function updateThemeSelect() {
+    const select = menu && menu._controls && menu._controls.themeSelect;
+    if (!select) return;
+    for (const option of select.options) {
+      const theme = THEMES.find((t) => t.id === option.value);
+      option.disabled = Boolean(theme && theme.premium && !settings.isPremium);
     }
-    grid._swatches = swatches;
-    return grid;
+    select.value = settings.theme || 'carpenter';
   }
 
-  function updateSwatches() {
-    const grid = menu && menu._controls && menu._controls.themeGrid;
-    if (!grid) return;
-    const current = settings.theme || 'carpenter';
-    for (const sw of grid._swatches) {
-      const theme = THEMES.find((t) => t.id === sw.dataset.theme);
-      sw.classList.toggle('locked', Boolean(theme && theme.premium && !settings.isPremium));
-      sw.classList.toggle('selected', sw.dataset.theme === current);
+  // Reveal the YouTube Data API key field only when a retrieval error happens,
+  // so the normal UI stays clean (users don't manage the key otherwise).
+  function revealApiKey(show, message) {
+    const controls = menu && menu._controls;
+    if (!controls || !controls.apiKeyLabel) return;
+    controls.apiKeyLabel.hidden = !show;
+    if (controls.apiKeyNote) {
+      controls.apiKeyNote.hidden = !show;
+      controls.apiKeyNote.textContent = show
+        ? (message || 'Couldn’t load comments — add or check your YouTube Data API key below.')
+        : '';
     }
   }
 
@@ -651,7 +634,7 @@
     }
     updateSelfLabels();
     applyTheme();
-    updateSwatches();
+    updateThemeSelect();
     menu._controls.opacityInput.value = String(settings.opacity);
     menu._controls.positionSelect.value = settings.position;
     if (root.activeElement !== menu._controls.apiKeyInput) {
@@ -806,6 +789,7 @@
       }
       if (!response?.ok) {
         showStatus(response?.message || 'YouTube comments could not be loaded.');
+        revealApiKey(true, response?.message || 'Couldn’t load comments — add or check your YouTube Data API key below.');
         return;
       }
 
@@ -824,6 +808,7 @@
       } else {
         showStatus('No synced comments for this video.');
       }
+      revealApiKey(false);
     });
   }
 
