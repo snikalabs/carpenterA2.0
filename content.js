@@ -136,7 +136,10 @@
       .comment { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px;
         background: var(--c-surface); border-left: 3px solid var(--c-accent); }
       .comment strong { color: var(--c-accent); }
-      .timestamp { margin-left: 6px; color: var(--c-accent-2); font-size: 11px; font-weight: 600; }
+      .timestamp { margin-left: 6px; color: var(--c-accent-2); font-size: 11px; font-weight: 600;
+        cursor: pointer; }
+      .timestamp:hover { text-decoration: underline; }
+      .timestamp:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; border-radius: 3px; }
       .menu { position: fixed; z-index: 2147483647; width: 250px; max-height: calc(100vh - 16px);
         overflow: auto; padding: 12px;
         color: var(--c-text); background: var(--c-header); border: 1px solid var(--c-border);
@@ -613,11 +616,31 @@
     item.dataset.time = String(comment.time);
     const author = createElement('strong', '', comment.author);
     const timestamp = createElement('span', 'timestamp', `[${formatTime(comment.time)}]`);
+    timestamp.setAttribute('role', 'button');
+    timestamp.tabIndex = 0;
+    timestamp.title = `Jump to ${formatTime(comment.time)}`;
+    timestamp.addEventListener('click', () => seekTo(comment.time));
+    timestamp.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        seekTo(comment.time);
+      }
+    });
     const text = createElement('div', '', comment.text);
     item.append(author, timestamp, text);
     feed.appendChild(item);
     feed.scrollTop = feed.scrollHeight;
     rendered.set(comment.key, item);
+  }
+
+  function seekTo(seconds) {
+    const video = document.querySelector('video');
+    if (!video) return;
+    try {
+      video.currentTime = seconds;
+      const playback = video.play?.();
+      if (playback && typeof playback.catch === 'function') playback.catch(() => {});
+    } catch {}
   }
 
   function formatTime(seconds) {
