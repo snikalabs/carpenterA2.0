@@ -4,7 +4,7 @@
     overlayEnabled: true,
     youtubeEnabled: true,
     opacity: 0.92,
-    position: 'top-right',
+    position: 'docked',
     youtubeApiKey: '',
     width: 330,
     height: 440,
@@ -66,31 +66,31 @@
     style.textContent = `
       :host {
         all: initial;
-        /* dark palette (default): slate blue accent + umber warm accent */
-        --c-panel: #1e2230;
-        --c-header: #171a24;
-        --c-surface: #272c3c;
-        --c-border: #3a4056;
-        --c-text: #e8eaf2;
-        --c-text-muted: #aab0c4;
-        --c-accent: #8e9bd4;       /* slate blue */
-        --c-accent-warm: #cf9a6d;  /* umber */
-        --c-grip: #7b84a0;
-        --c-hover: #ffffff1a;
+        /* dark palette: warm umber base + slate-blue secondary accent */
+        --c-panel: #221c15;
+        --c-header: #1a150f;
+        --c-surface: #2c241b;
+        --c-border: #42372a;
+        --c-text: #f1ece3;
+        --c-text-muted: #b6aa98;
+        --c-accent: #d1a054;    /* umber (primary / base) */
+        --c-accent-2: #8192b5;  /* slate blue (secondary; lightened for dark) */
+        --c-grip: #8a7a63;
+        --c-hover: #ffffff14;
         --c-shadow: rgba(0, 0, 0, 0.5);
       }
       @media (prefers-color-scheme: light) {
         :host {
-          /* light palette: warm umber-tinted paper + deep slate blue */
-          --c-panel: #f6f3ee;
-          --c-header: #ece5db;
-          --c-surface: #efe8de;
-          --c-border: #d7cec0;
-          --c-text: #2a2c38;
-          --c-text-muted: #6d6456;
-          --c-accent: #4c5a93;       /* deep slate blue */
-          --c-accent-warm: #8a5a30;  /* burnt umber */
-          --c-grip: #9b9284;
+          /* light palette: warm paper base + slate-blue secondary accent */
+          --c-panel: #f7f3ec;
+          --c-header: #efe8dc;
+          --c-surface: #efe7db;
+          --c-border: #ddd2c1;
+          --c-text: #2a241c;
+          --c-text-muted: #6f6454;
+          --c-accent: #a9742e;    /* umber (darkened for contrast on paper) */
+          --c-accent-2: #485872;  /* slate blue (as specified) */
+          --c-grip: #a1927d;
           --c-hover: #0000000f;
           --c-shadow: rgba(60, 50, 40, 0.20);
         }
@@ -116,17 +116,19 @@
       .resize-grip.top-right { top: 0; right: 0; cursor: nesw-resize; transform: rotate(90deg); }
       .resize-grip.bottom-left { bottom: 0; left: 0; cursor: nesw-resize; transform: rotate(-90deg); }
       .resize-grip.bottom-right { bottom: 0; right: 0; cursor: nwse-resize; }
-      .header { display: flex; align-items: center; gap: 8px; padding: 10px 12px;
-        background: var(--c-header); border-radius: 12px 12px 0 0;
-        cursor: move; touch-action: none; user-select: none; }
-      .title { flex: 1; font-size: 14px; font-weight: 700; color: var(--c-accent); letter-spacing: 0.02em; }
+      .controls { position: absolute; top: 6px; right: 6px; z-index: 2;
+        display: flex; gap: 4px; opacity: 0; transition: opacity 120ms ease; pointer-events: none; }
+      .panel:hover .controls, .controls:focus-within { opacity: 1; pointer-events: auto; }
+      .control-btn { width: 26px; height: 26px; display: flex; align-items: center;
+        justify-content: center; padding: 0; font-size: 14px; line-height: 1; color: var(--c-text);
+        background: var(--c-header); border: 1px solid var(--c-border); border-radius: 6px;
+        box-shadow: 0 1px 4px var(--c-shadow); }
+      .control-btn:hover { background: var(--c-hover); }
+      .control-btn.drag-grip { cursor: move; touch-action: none; }
       button, select, input { font: inherit; }
       button { color: inherit; cursor: pointer; }
       input[type="checkbox"], input[type="range"] { accent-color: var(--c-accent); }
-      .icon-button { min-width: 32px; height: 32px; border: 1px solid var(--c-border);
-        border-radius: 7px; background: transparent; color: var(--c-text); }
-      .icon-button:hover { background: var(--c-hover); }
-      .icon-button:hover, button:focus-visible, select:focus-visible, input:focus-visible {
+      button:focus-visible, select:focus-visible, input:focus-visible {
         outline: 2px solid var(--c-accent); outline-offset: 2px;
       }
       .feed { flex: 1; overflow: auto; padding: 12px; }
@@ -134,9 +136,7 @@
       .comment { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px;
         background: var(--c-surface); border-left: 3px solid var(--c-accent); }
       .comment strong { color: var(--c-accent); }
-      .timestamp { margin-left: 6px; color: var(--c-accent-warm); font-size: 11px; font-weight: 600; }
-      .footer { padding: 8px 12px; color: var(--c-text-muted); font-size: 11px;
-        border-top: 1px solid var(--c-border); }
+      .timestamp { margin-left: 6px; color: var(--c-accent-2); font-size: 11px; font-weight: 600; }
       .menu { position: fixed; z-index: 2147483647; width: 250px; max-height: calc(100vh - 16px);
         overflow: auto; padding: 12px;
         color: var(--c-text); background: var(--c-header); border: 1px solid var(--c-border);
@@ -165,28 +165,19 @@
     panel = createElement('section', 'panel');
     panel.setAttribute('aria-label', 'Carpenter synchronized comments');
 
-    const header = createElement('header', 'header');
-    header.appendChild(createElement('div', 'title', 'Carpenter'));
-    const menuButton = createElement('button', 'icon-button', 'Settings');
-    menuButton.type = 'button';
-    menuButton.setAttribute('aria-label', 'Open overlay settings');
-    menuButton.addEventListener('click', () => openMenu(menuButton));
-    header.appendChild(menuButton);
+    const controls = createElement('div', 'controls');
 
-    const closeButton = createElement('button', 'icon-button', '×');
-    closeButton.type = 'button';
-    closeButton.setAttribute('aria-label', 'Turn off overlay');
-    closeButton.addEventListener('click', () => saveSettings({ overlayEnabled: false }));
-    header.appendChild(closeButton);
-
-    header.addEventListener('pointerdown', (event) => {
-      if (event.button !== 0 || event.target.closest('button')) return;
+    const dragGrip = createElement('button', 'control-btn drag-grip', '⠿');
+    dragGrip.type = 'button';
+    dragGrip.setAttribute('aria-label', 'Move overlay');
+    dragGrip.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return;
       event.preventDefault();
       dragging = true;
       const bounds = panel.getBoundingClientRect();
       const offsetX = event.clientX - bounds.left;
       const offsetY = event.clientY - bounds.top;
-      try { header.setPointerCapture(event.pointerId); } catch {}
+      try { dragGrip.setPointerCapture(event.pointerId); } catch {}
       const drag = (moveEvent) => {
         const maxX = Math.max(0, innerWidth - bounds.width);
         const maxY = Math.max(0, innerHeight - bounds.height);
@@ -196,14 +187,26 @@
       };
       const finishDrag = () => {
         dragging = false;
-        header.removeEventListener('pointermove', drag);
+        dragGrip.removeEventListener('pointermove', drag);
         const moved = panel.getBoundingClientRect();
         saveSettings({ posX: Math.round(moved.left), posY: Math.round(moved.top) });
       };
-      header.addEventListener('pointermove', drag);
-      header.addEventListener('pointerup', finishDrag, { once: true });
-      header.addEventListener('pointercancel', finishDrag, { once: true });
+      dragGrip.addEventListener('pointermove', drag);
+      dragGrip.addEventListener('pointerup', finishDrag, { once: true });
+      dragGrip.addEventListener('pointercancel', finishDrag, { once: true });
     });
+
+    const menuButton = createElement('button', 'control-btn', '⚙');
+    menuButton.type = 'button';
+    menuButton.setAttribute('aria-label', 'Open overlay settings');
+    menuButton.addEventListener('click', () => openMenu(menuButton));
+
+    const closeButton = createElement('button', 'control-btn', '×');
+    closeButton.type = 'button';
+    closeButton.setAttribute('aria-label', 'Turn off overlay');
+    closeButton.addEventListener('click', () => saveSettings({ overlayEnabled: false }));
+
+    controls.append(dragGrip, menuButton, closeButton);
 
     feed = createElement('div', 'feed');
     feed.setAttribute('aria-live', 'polite');
@@ -214,15 +217,14 @@
       openMenu(null, event.clientX, event.clientY);
     });
 
-    const footer = createElement('footer', 'footer', 'Loads up to 200 timestamped comments through the YouTube Data API. Drag the header to move, the opposite corner to resize.');
     const resizeGrip = createElement('div', 'resize-grip');
     resizeGrip.setAttribute('role', 'separator');
     resizeGrip.setAttribute('aria-label', 'Resize overlay from the corner opposite its position');
     resizeGrip.addEventListener('pointerdown', (event) => {
       event.preventDefault();
       const bounds = panel.getBoundingClientRect();
-      const hasCustomPos = Number.isFinite(settings.posX) && Number.isFinite(settings.posY);
-      const gripPosition = hasCustomPos
+      const customOrDocked = (Number.isFinite(settings.posX) && Number.isFinite(settings.posY)) || settings.position === 'docked';
+      const gripPosition = customOrDocked
         ? 'bottom-right'
         : settings.position === 'bottom-right'
           ? 'top-left'
@@ -256,7 +258,7 @@
       resizeGrip.addEventListener('pointerup', finishResize, { once: true });
       resizeGrip.addEventListener('pointercancel', finishResize, { once: true });
     });
-    panel.append(header, feed, footer, resizeGrip);
+    panel.append(feed, controls, resizeGrip);
 
     menu = buildMenu();
     root.append(style, panel, menu);
@@ -285,7 +287,7 @@
     settingsMenu.appendChild(buildCheckboxSetting(
       'youtubeEnabled',
       'Enable on YouTube',
-      'Enable Project Freedom on YouTube',
+      'Enable Carpenter on YouTube',
     ));
 
     const apiKeyLabel = createElement('label', 'api-key-setting');
@@ -319,6 +321,7 @@
     const positionSelect = createElement('select');
     positionSelect.setAttribute('aria-label', 'Overlay position');
     for (const [value, label] of [
+      ['docked', 'Dock beside video'],
       ['top-right', 'Top right'],
       ['bottom-right', 'Bottom right'],
       ['bottom-left', 'Bottom left'],
@@ -373,12 +376,37 @@
     panel.style.bottom = 'auto';
   }
 
+  // Dock the panel just to the right of the video player, top-aligned with it,
+  // so it reads as a sidebar beside the video. Returns false if there is no real
+  // player to anchor to (so the caller can fall back to a viewport preset).
+  function dockToVideo() {
+    if (!panel) return false;
+    const video = document.querySelector('video');
+    if (!video) return false;
+    const r = video.getBoundingClientRect();
+    if (r.width < 120 || r.height < 90) return false;
+    const gap = 12;
+    const w = panel.offsetWidth || Number(settings.width) || 330;
+    let left = r.right + gap;
+    if (left + w > innerWidth - 8) left = Math.max(8, innerWidth - w - 8);
+    const top = Math.max(8, Math.min(r.top, innerHeight - 140));
+    panel.classList.remove('bottom-right', 'bottom-left');
+    panel.style.left = `${Math.round(left)}px`;
+    panel.style.top = `${Math.round(top)}px`;
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+    return true;
+  }
+
   function applySettings() {
     if (!panel || !menu) return;
 
     const visible = Boolean(settings.overlayEnabled && settings.youtubeEnabled && isWatchPage());
     panel.hidden = !visible;
     const hasCustomPos = Number.isFinite(settings.posX) && Number.isFinite(settings.posY);
+    panel.style.opacity = String(settings.opacity);
+    panel.style.width = `min(${settings.width}px, calc(100vw - 24px))`;
+    panel.style.height = `min(${settings.height}px, 70vh)`;
     if (!dragging) {
       if (hasCustomPos) {
         panel.classList.remove('bottom-right', 'bottom-left');
@@ -390,6 +418,8 @@
         panel.style.top = `${y}px`;
         panel.style.right = 'auto';
         panel.style.bottom = 'auto';
+      } else if (settings.position === 'docked' && dockToVideo()) {
+        // dockToVideo positioned the panel beside the video, top-aligned
       } else {
         panel.style.left = '';
         panel.style.top = '';
@@ -399,7 +429,8 @@
         panel.classList.toggle('bottom-left', settings.position === 'bottom-left');
       }
     }
-    const gripPosition = hasCustomPos
+    const customOrDocked = hasCustomPos || settings.position === 'docked';
+    const gripPosition = customOrDocked
       ? 'bottom-right'
       : settings.position === 'bottom-right'
         ? 'top-left'
@@ -409,9 +440,6 @@
     const resizeGrip = panel.querySelector('.resize-grip');
     resizeGrip.classList.remove('top-left', 'top-right', 'bottom-left', 'bottom-right');
     resizeGrip.classList.add(gripPosition);
-    panel.style.opacity = String(settings.opacity);
-    panel.style.width = `min(${settings.width}px, calc(100vw - 24px))`;
-    panel.style.height = `min(${settings.height}px, 70vh)`;
     for (const label of menu.querySelectorAll('.setting')) {
       if (label._control && label._settingKey) {
         label._control.checked = Boolean(settings[label._settingKey]);
@@ -449,7 +477,7 @@
   function closeMenu(returnFocus = true) {
     if (!menu || menu.hidden) return;
     menu.hidden = true;
-    if (returnFocus) (menuTrigger || root.querySelector('.header button'))?.focus();
+    if (returnFocus) (menuTrigger || root.querySelector('.controls button'))?.focus();
     menuTrigger = null;
   }
 
