@@ -23,6 +23,7 @@
   let comments = [];
   let lastStatus = '';
   let dragging = false;
+  let localSeq = 0;
 
   if (window.top !== window) return;
 
@@ -262,11 +263,19 @@
       // Stamp the comment with the current video position so it re-enters the
       // corpus already placed at the moment the user reacted to.
       const video = document.querySelector('video');
-      const stamp = video ? `${formatTime(Math.floor(video.currentTime))} ` : '';
+      const stampSeconds = video ? Math.floor(video.currentTime) : 0;
+      const stamped = video ? `${formatTime(stampSeconds)} ${text}` : text;
       setComposerNote('Posting to YouTube…', false);
-      depositToYouTube(stamp + text, (ok, message) => {
+      depositToYouTube(stamped, (ok, message) => {
         setComposerNote(message, !ok);
-        if (ok) composerInput.value = '';
+        if (ok) {
+          composerInput.value = '';
+          // Show the user's comment in the overlay immediately, placed at the
+          // moment they posted — no refetch/refresh needed. Display the raw
+          // reaction (the badge already shows the time) even though the posted
+          // text carries the stamp.
+          addLocalComment(stampSeconds, text);
+        }
       });
     };
 
@@ -584,6 +593,14 @@
     if (removedAny && rendered.size === 0 && lastStatus) {
       showStatus(lastStatus);
     }
+  }
+
+  // Add the user's own just-posted comment to the overlay feed right away, so it
+  // appears at its moment without waiting for a refetch of YouTube's comments.
+  function addLocalComment(time, text) {
+    comments.push({ key: `local:${++localSeq}`, time, author: 'You', text });
+    const video = document.querySelector('video');
+    syncCommentsToTime(video ? Math.floor(video.currentTime) : time);
   }
 
   // A real reaction cites zero or one moment; a comment packed with timestamps
