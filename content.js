@@ -12,8 +12,33 @@
     posY: null,
     showChannelName: false,
     channelNameCache: '',
+    theme: 'carpenter',
+    isPremium: false,
   };
   const settings = { ...DEFAULT_SETTINGS };
+
+  // Tier-1 themes. 'carpenter' is the free default (uses the base light/dark
+  // palette); the rest are premium. Each maps to the overlay's layer colors.
+  const THEMES = [
+    { id: 'carpenter', name: 'Carpenter', premium: false, light: false, bg: '#221c15', bubble: '#2c241b', inner: '#42372a', outer: '#7a5a2e', who: '#d1a054', ts: '#8192b5', text: '#f1ece3', muted: '#b6aa98' },
+    { id: 'midnight', name: 'Midnight', premium: true, light: false, bg: '#0f1627', bubble: '#1b2436', inner: '#4a6ba8', outer: '#334065', who: '#86a8e0', ts: '#64c9c0', text: '#e2e8f4', muted: '#8fa0bd' },
+    { id: 'nord', name: 'Nord', premium: true, light: false, bg: '#2e3440', bubble: '#3b4252', inner: '#88c0d0', outer: '#4c566a', who: '#88c0d0', ts: '#a3be8c', text: '#eceff4', muted: '#aab3c4' },
+    { id: 'dracula', name: 'Dracula', premium: true, light: false, bg: '#160f10', bubble: '#231415', inner: '#4a1f22', outer: '#d12f2f', who: '#ff5555', ts: '#cc9a9a', text: '#f2e2e2', muted: '#b79a9a' },
+    { id: 'solarized', name: 'Solarized', premium: true, light: false, bg: 'linear-gradient(160deg,#0d3b4d 0%,#124a5e 40%,#6e421d 100%)', bubble: '#123a49', inner: '#2b6f8a', outer: '#d07a2a', who: '#f2a04a', ts: '#6cc0e0', text: '#eae3d2', muted: '#9bb0b5' },
+    { id: 'gruvbox', name: 'Gruvbox', premium: true, light: false, bg: '#3a3935', bubble: '#47453e', inner: '#5a4f42', outer: '#a06a38', who: '#f5b531', ts: '#8ec07c', text: '#ece3c8', muted: '#b0a890' },
+    { id: 'synthwave', name: 'Synthwave', premium: true, light: false, bg: '#1a1033', bubble: '#251546', inner: '#26d9ff', outer: '#ff2d95', who: '#ff6ac1', ts: '#28e0e0', text: '#f3e9ff', muted: '#b9a6d4' },
+    { id: 'forest', name: 'Forest', premium: true, light: false, bg: '#10180f', bubble: '#1b281c', inner: '#2b4a30', outer: '#3f7a47', who: '#8fd694', ts: '#d8b25a', text: '#e5efe2', muted: '#9db59f' },
+    { id: 'rose', name: 'Rosé', premium: true, light: false, bg: '#191724', bubble: '#26233a', inner: '#403d52', outer: '#eb6f92', who: '#ebbcba', ts: '#f6c177', text: '#e0def4', muted: '#a7a3c0' },
+    { id: 'deepsea', name: 'Deep Sea', premium: true, light: false, bg: '#0a1f2a', bubble: '#112e3b', inner: '#1a4453', outer: '#1f6f8b', who: '#4fd1c5', ts: '#7fb3d5', text: '#d6eef2', muted: '#89adb8' },
+    { id: 'ember', name: 'Ember', premium: true, light: false, bg: '#1a0f0d', bubble: '#2a1513', inner: '#4a211a', outer: '#e2572b', who: '#ff8a5c', ts: '#f2c14e', text: '#f4e3dc', muted: '#c0a097' },
+    { id: 'mono', name: 'Mono', premium: true, light: false, bg: '#16171a', bubble: '#222327', inner: '#2e2f34', outer: '#4a4c53', who: '#ededf0', ts: '#9a9ba1', text: '#c9cacf', muted: '#8d8e94' },
+    { id: 'daylight', name: 'Daylight', premium: true, light: true, bg: '#f4efe6', bubble: '#fffdf8', inner: '#e7dfcd', outer: '#c9b79a', who: '#9a5b2e', ts: '#3f5b8a', text: '#2b2620', muted: '#6d6456' },
+    { id: 'cyberpunk', name: 'Cyberpunk', premium: true, light: false, bg: '#0c0e14', bubble: '#15181f', inner: '#0ff0fc', outer: '#f7e017', who: '#f7e017', ts: '#0ff0fc', text: '#e8f6ff', muted: '#9fb3c4' },
+    { id: 'lavender', name: 'Lavender', premium: true, light: false, bg: '#1b1526', bubble: '#271d38', inner: '#3a2d52', outer: '#9d7bd8', who: '#c3a6f0', ts: '#8fbcd4', text: '#ece4f7', muted: '#b0a3c4' },
+    { id: 'royal', name: 'Royal', premium: true, light: false, bg: '#0f0d0a', bubble: '#1a1611', inner: '#3a3020', outer: '#c9a227', who: '#e6c75a', ts: '#cdbf8f', text: '#f0ead6', muted: '#b5a98a' },
+  ];
+  const THEME_VARS = ['--c-panel', '--c-header', '--c-surface', '--c-border', '--c-outer',
+    '--c-accent', '--c-accent-2', '--c-text', '--c-text-muted', '--c-grip', '--c-hover', '--c-shadow'];
   const rendered = new Map();
   let host;
   let root;
@@ -86,6 +111,7 @@
         --c-text-muted: #b6aa98;
         --c-accent: #d1a054;    /* umber (primary / base) */
         --c-accent-2: #8192b5;  /* slate blue (secondary; lightened for dark) */
+        --c-outer: #7a5a2e;     /* outer border ring */
         --c-grip: #8a7a63;
         --c-hover: #ffffff14;
         --c-shadow: rgba(0, 0, 0, 0.5);
@@ -101,6 +127,7 @@
           --c-text-muted: #6f6454;
           --c-accent: #a9742e;    /* umber (darkened for contrast on paper) */
           --c-accent-2: #485872;  /* slate blue (as specified) */
+          --c-outer: #c9b79a;     /* outer border ring */
           --c-grip: #a1927d;
           --c-hover: #0000000f;
           --c-shadow: rgba(60, 50, 40, 0.20);
@@ -112,7 +139,7 @@
         display: flex; flex-direction: column; min-width: 260px; min-height: 220px;
         max-width: calc(100vw - 24px); max-height: 90vh; overflow: hidden;
         color: var(--c-text); background: var(--c-panel); border: 1px solid var(--c-border);
-        border-radius: 12px; box-shadow: 0 8px 28px var(--c-shadow);
+        border-radius: 12px; box-shadow: 0 0 0 1.5px var(--c-outer), 0 8px 28px var(--c-shadow);
         font: 14px/1.4 system-ui, sans-serif;
       }
       .panel[hidden] { display: none; }
@@ -144,8 +171,10 @@
       }
       .feed { flex: 1; overflow: auto; padding: 12px; }
       .status { color: var(--c-text-muted); }
-      .comment { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px;
-        background: var(--c-surface); border-left: 3px solid var(--c-accent); }
+      .comment { margin: 0 0 10px; padding: 8px 10px; border-radius: 9px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.10)), var(--c-surface);
+        border-left: 3px solid var(--c-accent);
+        box-shadow: 0 4px 9px var(--c-shadow), inset 0 1px 0 rgba(255,255,255,0.10); }
       .comment strong { color: var(--c-accent); }
       .timestamp { margin-left: 6px; color: var(--c-accent-2); font-size: 11px; font-weight: 600;
         cursor: pointer; }
@@ -165,7 +194,7 @@
         border: 1px solid var(--c-accent); border-radius: 6px; font-weight: 600; cursor: pointer; }
       .composer button:hover { filter: brightness(1.08); }
       .composer-note { font-size: 11px; color: var(--c-text-muted); min-height: 13px; }
-      .menu { position: fixed; z-index: 2147483647; width: 250px; max-height: calc(100vh - 16px);
+      .menu { position: fixed; z-index: 2147483647; width: 268px; max-height: calc(100vh - 16px);
         overflow: auto; padding: 12px;
         color: var(--c-text); background: var(--c-header); border: 1px solid var(--c-border);
         border-radius: 10px; box-shadow: 0 8px 28px var(--c-shadow); }
@@ -183,6 +212,21 @@
       .menu-action { width: 100%; margin-top: 10px; padding: 7px;
         color: inherit; text-align: left; background: var(--c-surface);
         border: 1px solid var(--c-border); border-radius: 6px; }
+      .theme-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 6px 0 2px; }
+      .swatch { position: relative; padding: 0; border: 1px solid var(--c-border); border-radius: 7px;
+        background: var(--sw-bg); overflow: hidden; height: 40px; cursor: pointer; }
+      .swatch-prev { position: absolute; inset: 4px 4px 13px; display: flex; flex-direction: column;
+        justify-content: center; gap: 3px; border-radius: 4px; padding: 4px; box-shadow: inset 0 0 0 1px var(--sw-outer); }
+      .swatch-bar { height: 4px; border-radius: 2px; background: var(--sw-bubble); border-left: 2px solid var(--sw-who); }
+      .swatch-bar.short { width: 68%; }
+      .swatch-name { position: absolute; left: 0; right: 0; bottom: 0; font-size: 8px; line-height: 12px;
+        text-align: center; color: var(--c-text); background: var(--c-header);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; }
+      .swatch.selected { outline: 2px solid var(--c-accent); outline-offset: 1px; }
+      .swatch-lock { position: absolute; top: 2px; right: 3px; font-size: 9px; color: #ffd24d;
+        text-shadow: 0 1px 2px #000; display: none; }
+      .swatch.locked .swatch-lock { display: block; }
+      .swatch.locked { opacity: 0.55; cursor: default; }
       @media (max-width: 480px) {
         .panel { top: 12px; right: 12px; max-height: 85vh; }
         .panel.bottom-right { top: auto; bottom: 12px; }
@@ -364,6 +408,15 @@
     const heading = createElement('h2', '', 'Overlay settings');
     settingsMenu.appendChild(heading);
 
+    settingsMenu.appendChild(createElement('h2', '', 'Customize · Theme'));
+    settingsMenu.appendChild(buildCheckboxSetting(
+      'isPremium',
+      'Unlock premium themes (testing)',
+      'Dev toggle: unlock the premium themes for testing',
+    ));
+    const themeGrid = buildThemeGrid();
+    settingsMenu.appendChild(themeGrid);
+
     settingsMenu.appendChild(buildCheckboxSetting(
       'overlayEnabled',
       'Overlay on',
@@ -434,7 +487,7 @@
     closeMenuButton.addEventListener('click', closeMenu);
     settingsMenu.appendChild(closeMenuButton);
 
-    settingsMenu._controls = { opacityInput, positionSelect, apiKeyInput };
+    settingsMenu._controls = { opacityInput, positionSelect, apiKeyInput, themeGrid };
     settingsMenu.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -455,6 +508,67 @@
     label._control = input;
     label._settingKey = key;
     return label;
+  }
+
+  // Apply the selected theme by setting the layer CSS variables on the host.
+  // The free default ('carpenter') and any locked premium theme clear the inline
+  // vars so the base light/dark palette applies.
+  function applyTheme() {
+    if (!host) return;
+    const id = settings.theme || 'carpenter';
+    const theme = THEMES.find((t) => t.id === id);
+    const locked = theme && theme.premium && !settings.isPremium;
+    if (!theme || theme.id === 'carpenter' || locked) {
+      for (const prop of THEME_VARS) host.style.removeProperty(prop);
+      return;
+    }
+    const map = {
+      '--c-panel': theme.bg, '--c-header': theme.bubble, '--c-surface': theme.bubble,
+      '--c-border': theme.inner, '--c-outer': theme.outer,
+      '--c-accent': theme.who, '--c-accent-2': theme.ts,
+      '--c-text': theme.text, '--c-text-muted': theme.muted, '--c-grip': theme.muted,
+      '--c-hover': theme.light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.10)',
+      '--c-shadow': theme.light ? 'rgba(60,50,40,0.20)' : 'rgba(0,0,0,0.5)',
+    };
+    for (const prop in map) host.style.setProperty(prop, map[prop]);
+  }
+
+  function buildThemeGrid() {
+    const grid = createElement('div', 'theme-grid');
+    const swatches = [];
+    for (const theme of THEMES) {
+      const sw = createElement('button', 'swatch');
+      sw.type = 'button';
+      sw.dataset.theme = theme.id;
+      sw.title = theme.name + (theme.premium ? ' (Premium)' : '');
+      sw.setAttribute('aria-label', sw.title);
+      sw.style.setProperty('--sw-bg', theme.bg);
+      sw.style.setProperty('--sw-bubble', theme.bubble);
+      sw.style.setProperty('--sw-outer', theme.outer);
+      sw.style.setProperty('--sw-who', theme.who);
+      const prev = createElement('div', 'swatch-prev');
+      prev.append(createElement('div', 'swatch-bar'), createElement('div', 'swatch-bar short'));
+      sw.append(prev, createElement('div', 'swatch-lock', '★'), createElement('div', 'swatch-name', theme.name));
+      sw.addEventListener('click', () => {
+        if (theme.premium && !settings.isPremium) return;
+        saveSettings({ theme: theme.id });
+      });
+      swatches.push(sw);
+      grid.appendChild(sw);
+    }
+    grid._swatches = swatches;
+    return grid;
+  }
+
+  function updateSwatches() {
+    const grid = menu && menu._controls && menu._controls.themeGrid;
+    if (!grid) return;
+    const current = settings.theme || 'carpenter';
+    for (const sw of grid._swatches) {
+      const theme = THEMES.find((t) => t.id === sw.dataset.theme);
+      sw.classList.toggle('locked', Boolean(theme && theme.premium && !settings.isPremium));
+      sw.classList.toggle('selected', sw.dataset.theme === current);
+    }
   }
 
   function placePanelAt(x, y) {
@@ -536,6 +650,8 @@
       }
     }
     updateSelfLabels();
+    applyTheme();
+    updateSwatches();
     menu._controls.opacityInput.value = String(settings.opacity);
     menu._controls.positionSelect.value = settings.position;
     if (root.activeElement !== menu._controls.apiKeyInput) {
