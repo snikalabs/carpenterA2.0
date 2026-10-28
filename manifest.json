@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Carpenter",
+  "version": "0.1.0",
+  "description": "Rebuild the real crowd — replay real viewer comments in sync with the video, like a live watch party.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://www.googleapis.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Toggle Carpenter overlay"
+  },
+  "commands": {
+    "open-chat-menu": {
+      "suggested_key": {
+        "default": "Alt+Shift+M"
+      },
+      "description": "Open the Carpenter overlay menu"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
