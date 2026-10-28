@@ -259,8 +259,12 @@
     const submitComposer = () => {
       const text = composerInput.value.trim();
       if (!text) return;
+      // Stamp the comment with the current video position so it re-enters the
+      // corpus already placed at the moment the user reacted to.
+      const video = document.querySelector('video');
+      const stamp = video ? `${formatTime(Math.floor(video.currentTime))} ` : '';
       setComposerNote('Posting to YouTube…', false);
-      depositToYouTube(text, (ok, message) => {
+      depositToYouTube(stamp + text, (ok, message) => {
         setComposerNote(message, !ok);
         if (ok) composerInput.value = '';
       });
@@ -556,7 +560,7 @@
     comments = [];
     rendered.clear();
     feed.replaceChildren();
-    showStatus('Loading comments from YouTube…');
+    showStatus('');
     requestComments(id);
   }
 
@@ -621,7 +625,6 @@
       }
 
       const fetchedComments = Array.isArray(response.comments) ? response.comments : [];
-      const diagnostics = response.diagnostics || {};
       comments = fetchedComments
         .map((comment, index) => ({
           key: `${id}:${index}`,
@@ -630,25 +633,12 @@
           text: comment.text,
         }))
         .filter((comment) => comment.time !== null && !isTimestampList(comment.text));
-      const threadCount = Number.isInteger(diagnostics.topLevelThreadCount)
-        ? diagnostics.topLevelThreadCount
-        : fetchedComments.length;
-      const pageCount = Number.isInteger(diagnostics.pagesRetrieved)
-        ? diagnostics.pagesRetrieved
-        : 0;
-      const resultSummary = diagnostics.hasMorePages
-        ? 'More top-level pages are available.'
-        : 'The API returned no further top-level page token.';
-      const replySummary = Number.isInteger(diagnostics.totalReplyCount)
-        ? ` ${diagnostics.totalReplyCount} replies are available but not loaded yet.`
-        : '';
-      const timestampSummary = comments.length
-        ? ` Found ${comments.length}${comments.length >= diagnostics.timestampedCommentLimit ? ' (limit reached)' : ''} timestamped comments.`
-        : ' No timestamped comments found.';
-      const warning = response.message ? ` Partial results: ${response.message}` : '';
-      showStatus(
-        `Fetched ${threadCount} top-level threads over ${pageCount} API page(s). ${resultSummary}${replySummary}${timestampSummary}${warning}`,
-      );
+      if (comments.length) {
+        feed.replaceChildren();
+        lastStatus = '';
+      } else {
+        showStatus('No synced comments for this video.');
+      }
     });
   }
 
@@ -797,7 +787,7 @@
       comments = [];
       rendered.clear();
       feed.replaceChildren();
-      showStatus('Loading comments from YouTube…');
+      showStatus('');
       requestComments(videoId);
     }
   });
