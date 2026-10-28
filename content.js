@@ -528,7 +528,9 @@
   // A real reaction cites zero or one moment; a comment packed with timestamps
   // is almost always a chapter/index dump (a table of contents), which adds
   // nothing to the watch-party feed. Skip comments with this many or more.
-  const TIMESTAMP_LIST_THRESHOLD = 3;
+  // Tuned higher for sports/full-game uploads, where viewers post long key-play
+  // indexes for people skimming the game.
+  const TIMESTAMP_LIST_THRESHOLD = 5;
 
   function countTimestamps(text) {
     const matches = text.match(/(?:^|\s)(?:\d{1,2}:)?\d{1,2}:[0-5]\d(?=$|[\s.,!?])/g);
