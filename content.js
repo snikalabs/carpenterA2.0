@@ -10,6 +10,8 @@
     height: 440,
     posX: null,
     posY: null,
+    showChannelName: false,
+    channelNameCache: '',
   };
   const settings = { ...DEFAULT_SETTINGS };
   const rendered = new Map();
@@ -284,6 +286,7 @@
           // reaction (the badge already shows the time) even though the posted
           // text carries the stamp.
           addLocalComment(stampSeconds, text);
+          captureChannelName(stamped);
         }
       });
     };
@@ -370,6 +373,11 @@
       'youtubeEnabled',
       'Enable on YouTube',
       'Enable Carpenter on YouTube',
+    ));
+    settingsMenu.appendChild(buildCheckboxSetting(
+      'showChannelName',
+      'Show my channel name',
+      'Show your channel name instead of "You" on comments you post',
     ));
 
     const apiKeyLabel = createElement('label', 'api-key-setting');
@@ -527,6 +535,7 @@
         label._control.checked = Boolean(settings[label._settingKey]);
       }
     }
+    updateSelfLabels();
     menu._controls.opacityInput.value = String(settings.opacity);
     menu._controls.positionSelect.value = settings.position;
     if (root.activeElement !== menu._controls.apiKeyInput) {
@@ -607,9 +616,43 @@
   // Add the user's own just-posted comment to the overlay feed right away, so it
   // appears at its moment without waiting for a refetch of YouTube's comments.
   function addLocalComment(time, text) {
-    comments.push({ key: `local:${++localSeq}`, time, author: 'You', text });
+    comments.push({ key: `local:${++localSeq}`, time, author: 'You', text, self: true });
     const video = document.querySelector('video');
     syncCommentsToTime(video ? Math.floor(video.currentTime) : time);
+  }
+
+  function selfLabel() {
+    return (settings.showChannelName && settings.channelNameCache) ? settings.channelNameCache : 'You';
+  }
+
+  function updateSelfLabels() {
+    const label = selfLabel();
+    for (const [, el] of rendered) {
+      if (el.dataset && el.dataset.self) {
+        const strong = el.querySelector('strong');
+        if (strong && strong.textContent !== label) strong.textContent = label;
+      }
+    }
+  }
+
+  // Learn the user's channel name from the comment they just posted (YouTube
+  // prepends it to the thread list) and cache it, so the overlay can show the
+  // channel name instead of "You" when that option is enabled.
+  function captureChannelName(postedText, attempts) {
+    if (settings.channelNameCache) return;
+    attempts = attempts || 0;
+    const norm = (value) => value.replace(/\s+/g, ' ').trim();
+    const target = norm(postedText);
+    const threads = document.querySelectorAll('ytd-comment-thread-renderer, ytd-comment-view-model');
+    for (const thread of threads) {
+      const content = thread.querySelector('#content-text');
+      const author = thread.querySelector('#author-text');
+      if (content && author && norm(content.textContent) === target) {
+        const name = norm(author.textContent);
+        if (name) { saveSettings({ channelNameCache: name }); updateSelfLabels(); return; }
+      }
+    }
+    if (attempts < 20) setTimeout(() => captureChannelName(postedText, attempts + 1), 300);
   }
 
   // A real reaction cites zero or one moment; a comment packed with timestamps
@@ -703,7 +746,8 @@
 
     const item = createElement('article', 'comment');
     item.dataset.time = String(comment.time);
-    const author = createElement('strong', '', comment.author);
+    if (comment.self) item.dataset.self = '1';
+    const author = createElement('strong', '', comment.self ? selfLabel() : comment.author);
     const timestamp = createElement('span', 'timestamp', `[${formatTime(comment.time)}]`);
     timestamp.setAttribute('role', 'button');
     timestamp.tabIndex = 0;
