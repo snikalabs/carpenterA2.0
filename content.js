@@ -259,7 +259,7 @@
     const submitComposer = () => {
       const text = composerInput.value.trim();
       if (!text) return;
-      setComposerNote('Adding to YouTube’s comment box…', false);
+      setComposerNote('Posting to YouTube…', false);
       depositToYouTube(text, (ok, message) => {
         setComposerNote(message, !ok);
         if (ok) composerInput.value = '';
@@ -716,9 +716,9 @@
     } catch {}
   }
 
-  // Mode 1 (ghost-tie): deposit the user's text into YouTube's own comment box
-  // so they can review and post it there. We fill the native field rather than
-  // auto-submitting, so nothing is posted without the user's explicit click.
+  // Mode 1 (ghost-tie): put the user's text into YouTube's own comment box and
+  // post it. The user typed the text and pressed Send, so posting on their
+  // behalf is their explicit per-message intent.
   function depositToYouTube(text, onResult) {
     const report = (ok, message) => { if (typeof onResult === 'function') onResult(ok, message); };
     const placeholder = document.querySelector('#simplebox-placeholder')
@@ -726,8 +726,26 @@
       || document.querySelector('#placeholder-area');
     if (placeholder) placeholder.click();
 
+    // Click YouTube's Comment button once it enables (it stays disabled until it
+    // registers the inserted text).
+    const submitWhenReady = (attempts) => {
+      const renderer = document.querySelector('ytd-commentbox #submit-button')
+        || document.querySelector('#submit-button');
+      const button = (renderer && renderer.querySelector('button')) || renderer;
+      const disabled = !button || button.disabled
+        || button.getAttribute('aria-disabled') === 'true'
+        || (renderer && renderer.hasAttribute && renderer.hasAttribute('disabled'));
+      if (button && !disabled) {
+        button.click();
+        report(true, 'Posted to YouTube ✓');
+        return;
+      }
+      if (attempts < 15) { setTimeout(() => submitWhenReady(attempts + 1), 120); return; }
+      report(false, 'Filled YouTube’s box, but couldn’t auto-post — click Comment there to post.');
+    };
+
     let tries = 0;
-    const attempt = () => {
+    const fill = () => {
       const editable = document.querySelector('ytd-comment-simplebox-renderer #contenteditable-root')
         || document.querySelector('ytd-commentbox #contenteditable-root')
         || document.querySelector('#contenteditable-root');
@@ -746,13 +764,13 @@
         editable.dispatchEvent(new InputEvent('input', {
           bubbles: true, cancelable: true, inputType: 'insertText', data: text,
         }));
-        report(true, 'Added to YouTube’s comment box — review and post it there.');
+        submitWhenReady(0);
         return;
       }
-      if (tries++ < 12) { setTimeout(attempt, 120); return; }
+      if (tries++ < 12) { setTimeout(fill, 120); return; }
       report(false, 'Couldn’t find YouTube’s comment box. Scroll to the comments and try again.');
     };
-    setTimeout(attempt, 120);
+    setTimeout(fill, 120);
   }
 
   function formatTime(seconds) {
