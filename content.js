@@ -140,6 +140,15 @@
         cursor: pointer; }
       .timestamp:hover { text-decoration: underline; }
       .timestamp:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; border-radius: 3px; }
+      .composer { display: flex; flex-direction: column; gap: 4px; padding: 8px;
+        border-top: 1px solid var(--c-border); }
+      .composer-row { display: flex; gap: 6px; }
+      .composer input { flex: 1; min-width: 0; padding: 6px 8px; color: var(--c-text);
+        background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 6px; }
+      .composer button { padding: 6px 12px; color: var(--c-panel); background: var(--c-accent);
+        border: 1px solid var(--c-accent); border-radius: 6px; font-weight: 600; cursor: pointer; }
+      .composer button:hover { filter: brightness(1.08); }
+      .composer-note { font-size: 11px; color: var(--c-text-muted); min-height: 13px; }
       .menu { position: fixed; z-index: 2147483647; width: 250px; max-height: calc(100vh - 16px);
         overflow: auto; padding: 12px;
         color: var(--c-text); background: var(--c-header); border: 1px solid var(--c-border);
@@ -220,6 +229,46 @@
       openMenu(null, event.clientX, event.clientY);
     });
 
+    const composer = createElement('div', 'composer');
+    const composerRow = createElement('div', 'composer-row');
+    const composerInput = createElement('input');
+    composerInput.type = 'text';
+    composerInput.placeholder = 'Add to the conversation…';
+    composerInput.setAttribute('aria-label', 'Write a comment to post on YouTube');
+    const sendButton = createElement('button', '', 'Send');
+    sendButton.type = 'button';
+    const composerNote = createElement('div', 'composer-note');
+    composerNote.setAttribute('aria-live', 'polite');
+
+    let composerNoteTimer = null;
+    const setComposerNote = (text, isError) => {
+      composerNote.textContent = text;
+      composerNote.style.color = isError ? 'var(--c-accent-2)' : 'var(--c-text-muted)';
+      if (composerNoteTimer) clearTimeout(composerNoteTimer);
+      if (text) composerNoteTimer = setTimeout(() => { composerNote.textContent = ''; }, 5000);
+    };
+
+    const submitComposer = () => {
+      const text = composerInput.value.trim();
+      if (!text) return;
+      setComposerNote('Adding to YouTube’s comment box…', false);
+      depositToYouTube(text, (ok, message) => {
+        setComposerNote(message, !ok);
+        if (ok) composerInput.value = '';
+      });
+    };
+
+    sendButton.addEventListener('click', submitComposer);
+    composerInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        submitComposer();
+      }
+    });
+
+    composerRow.append(composerInput, sendButton);
+    composer.append(composerRow, composerNote);
+
     const resizeGrip = createElement('div', 'resize-grip');
     resizeGrip.setAttribute('role', 'separator');
     resizeGrip.setAttribute('aria-label', 'Resize overlay from the corner opposite its position');
@@ -261,7 +310,7 @@
       resizeGrip.addEventListener('pointerup', finishResize, { once: true });
       resizeGrip.addEventListener('pointercancel', finishResize, { once: true });
     });
-    panel.append(feed, controls, resizeGrip);
+    panel.append(feed, composer, controls, resizeGrip);
 
     menu = buildMenu();
     root.append(style, panel, menu);
@@ -657,6 +706,45 @@
       const playback = video.play?.();
       if (playback && typeof playback.catch === 'function') playback.catch(() => {});
     } catch {}
+  }
+
+  // Mode 1 (ghost-tie): deposit the user's text into YouTube's own comment box
+  // so they can review and post it there. We fill the native field rather than
+  // auto-submitting, so nothing is posted without the user's explicit click.
+  function depositToYouTube(text, onResult) {
+    const report = (ok, message) => { if (typeof onResult === 'function') onResult(ok, message); };
+    const placeholder = document.querySelector('#simplebox-placeholder')
+      || document.querySelector('ytd-comment-simplebox-renderer #placeholder-area')
+      || document.querySelector('#placeholder-area');
+    if (placeholder) placeholder.click();
+
+    let tries = 0;
+    const attempt = () => {
+      const editable = document.querySelector('ytd-comment-simplebox-renderer #contenteditable-root')
+        || document.querySelector('ytd-commentbox #contenteditable-root')
+        || document.querySelector('#contenteditable-root');
+      if (editable) {
+        editable.focus();
+        let inserted = false;
+        try {
+          const selection = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(editable);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          inserted = document.execCommand('insertText', false, text);
+        } catch {}
+        if (!inserted) editable.textContent = text;
+        editable.dispatchEvent(new InputEvent('input', {
+          bubbles: true, cancelable: true, inputType: 'insertText', data: text,
+        }));
+        report(true, 'Added to YouTube’s comment box — review and post it there.');
+        return;
+      }
+      if (tries++ < 12) { setTimeout(attempt, 120); return; }
+      report(false, 'Couldn’t find YouTube’s comment box. Scroll to the comments and try again.');
+    };
+    setTimeout(attempt, 120);
   }
 
   function formatTime(seconds) {
