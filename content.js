@@ -525,6 +525,20 @@
     }
   }
 
+  // A real reaction cites zero or one moment; a comment packed with timestamps
+  // is almost always a chapter/index dump (a table of contents), which adds
+  // nothing to the watch-party feed. Skip comments with this many or more.
+  const TIMESTAMP_LIST_THRESHOLD = 3;
+
+  function countTimestamps(text) {
+    const matches = text.match(/(?:^|\s)(?:\d{1,2}:)?\d{1,2}:[0-5]\d(?=$|[\s.,!?])/g);
+    return matches ? matches.length : 0;
+  }
+
+  function isTimestampList(text) {
+    return countTimestamps(text) >= TIMESTAMP_LIST_THRESHOLD;
+  }
+
   function parseTimestamp(text) {
     const match = text.match(/(?:^|\s)(?:(\d{1,2}):)?(\d{1,2}):([0-5]\d)(?=$|[\s.,!?])/);
     if (!match) return null;
@@ -556,7 +570,7 @@
           author: comment.author,
           text: comment.text,
         }))
-        .filter((comment) => comment.time !== null);
+        .filter((comment) => comment.time !== null && !isTimestampList(comment.text));
       const threadCount = Number.isInteger(diagnostics.topLevelThreadCount)
         ? diagnostics.topLevelThreadCount
         : fetchedComments.length;
