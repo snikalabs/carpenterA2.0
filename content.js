@@ -244,6 +244,11 @@
     composerInput.type = 'text';
     composerInput.placeholder = 'Add to the conversation…';
     composerInput.setAttribute('aria-label', 'Write a comment to post on YouTube');
+    // Don't let Chrome offer to save/autofill this field after each post.
+    composerInput.setAttribute('autocomplete', 'off');
+    composerInput.setAttribute('autocorrect', 'off');
+    composerInput.setAttribute('autocapitalize', 'off');
+    composerInput.spellcheck = false;
     const sendButton = createElement('button', '', 'Send');
     sendButton.type = 'button';
     const composerNote = createElement('div', 'composer-note');
