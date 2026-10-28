@@ -152,8 +152,13 @@
       .composer { display: flex; flex-direction: column; gap: 4px; padding: 8px;
         border-top: 1px solid var(--c-border); }
       .composer-row { display: flex; gap: 6px; }
-      .composer input { flex: 1; min-width: 0; padding: 6px 8px; color: var(--c-text);
-        background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 6px; }
+      .composer .ce-input { flex: 1; min-width: 0; padding: 6px 8px; color: var(--c-text);
+        background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 6px;
+        min-height: 19px; max-height: 84px; overflow-y: auto; outline: none;
+        white-space: pre-wrap; word-break: break-word; cursor: text; text-align: left; }
+      .composer .ce-input:empty::before { content: attr(data-placeholder);
+        color: var(--c-text-muted); pointer-events: none; }
+      .composer .ce-input:focus { outline: 2px solid var(--c-accent); outline-offset: 1px; }
       .composer button { padding: 6px 12px; color: var(--c-panel); background: var(--c-accent);
         border: 1px solid var(--c-accent); border-radius: 6px; font-weight: 600; cursor: pointer; }
       .composer button:hover { filter: brightness(1.08); }
@@ -240,14 +245,13 @@
 
     const composer = createElement('div', 'composer');
     const composerRow = createElement('div', 'composer-row');
-    const composerInput = createElement('input');
-    composerInput.type = 'text';
-    composerInput.placeholder = 'Add to the conversation…';
+    // A contenteditable div instead of <input>, so Chrome's form autofill never
+    // offers to save what was typed (Chrome ignores autocomplete="off" on inputs).
+    const composerInput = createElement('div', 'ce-input');
+    composerInput.contentEditable = 'true';
+    composerInput.setAttribute('role', 'textbox');
     composerInput.setAttribute('aria-label', 'Write a comment to post on YouTube');
-    // Don't let Chrome offer to save/autofill this field after each post.
-    composerInput.setAttribute('autocomplete', 'off');
-    composerInput.setAttribute('autocorrect', 'off');
-    composerInput.setAttribute('autocapitalize', 'off');
+    composerInput.setAttribute('data-placeholder', 'Add to the conversation…');
     composerInput.spellcheck = false;
     const sendButton = createElement('button', '', 'Send');
     sendButton.type = 'button';
@@ -263,7 +267,7 @@
     };
 
     const submitComposer = () => {
-      const text = composerInput.value.trim();
+      const text = composerInput.textContent.trim();
       if (!text) return;
       // Stamp the comment with the current video position so it re-enters the
       // corpus already placed at the moment the user reacted to.
@@ -274,7 +278,7 @@
       depositToYouTube(stamped, (ok, message) => {
         setComposerNote(message, !ok);
         if (ok) {
-          composerInput.value = '';
+          composerInput.textContent = '';
           // Show the user's comment in the overlay immediately, placed at the
           // moment they posted — no refetch/refresh needed. Display the raw
           // reaction (the badge already shows the time) even though the posted
@@ -286,7 +290,7 @@
 
     sendButton.addEventListener('click', submitComposer);
     composerInput.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
+      if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         submitComposer();
       }
